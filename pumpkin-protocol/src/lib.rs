@@ -401,9 +401,9 @@ impl NumberFormat {
                 // TODO: Style write
                 Ok(())
             }
-            Self::Fixed(_text) => {
+            Self::Fixed(text) => {
                 write.write_var_int(&2.into())?;
-                // TODO: TextComponent write
+                write.write_slice(&text.encode())?;
                 Ok(())
             }
         }

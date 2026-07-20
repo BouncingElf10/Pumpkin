@@ -1,3 +1,4 @@
+use crate::codec::item_stack_seralizer::ItemStackTemplateSerializer;
 use crate::codec::var_int::VarInt;
 use pumpkin_data::Advancement;
 use pumpkin_data::advancement_data::AdvancementProgressData;
@@ -44,7 +45,7 @@ impl ClientPacket for CUpdateAdvancements {
     fn write_packet_data(
         &self,
         mut write: impl std::io::Write,
-        _version: &JavaMinecraftVersion,
+        version: &JavaMinecraftVersion,
     ) -> Result<(), crate::ser::WritingError> {
         write.write_bool(self.reset)?;
 
@@ -65,10 +66,9 @@ impl ClientPacket for CUpdateAdvancements {
                 write.write_slice(&display.get_description().encode())?;
 
                 // Item icon
-                // TODO: serialize item_icon (ItemStack)
-                unimplemented!("Item serialization is not yet implemented without serde");
+                ItemStackTemplateSerializer::from(display.item_icon.clone())
+                    .write_with_version(&mut write, version)?;
 
-                /*
                 write.write_var_int(&VarInt(display.frame_type as i32))?;
                 let flags = (display.has_background() as i32)
                     | ((display.show_toast as i32) << 1)
@@ -79,7 +79,6 @@ impl ClientPacket for CUpdateAdvancements {
                 }
                 write.write_f32_be(display.x)?;
                 write.write_f32_be(display.y)?;
-                */
             }
 
             write.write_var_int(&VarInt(adv.requirements.len() as i32))?;
