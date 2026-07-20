@@ -1016,6 +1016,14 @@ pub fn deserialize_java_serverbound_packet(
                 item_name: p.item_name.into(),
             }))
         }
+        id if id == pumpkin_protocol::java::server::play::SSeenAdvancement::to_id(version) => {
+            use pumpkin_protocol::ServerPacket;
+            let p = <pumpkin_protocol::java::server::play::SSeenAdvancement as pumpkin_protocol::ServerPacket>::read(&mut Cursor::new(payload), &version).ok()?;
+            Some(match p {
+                pumpkin_protocol::java::server::play::SSeenAdvancement::OpenTab(identifier) => ServerboundPacket::SSeenAdvancement(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::java_packets::SSeenAdvancement::OpenTab(identifier.to_string())),
+                pumpkin_protocol::java::server::play::SSeenAdvancement::CloseTab => ServerboundPacket::SSeenAdvancement(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::java_packets::SSeenAdvancement::CloseTab),
+            })
+        }
         id if id == pumpkin_protocol::java::server::play::SSelectTrade::to_id(version) => {
             use pumpkin_protocol::ServerPacket;
             let p = <pumpkin_protocol::java::server::play::SSelectTrade as pumpkin_protocol::ServerPacket>::read(&mut Cursor::new(payload), &version).ok()?;
@@ -2128,6 +2136,23 @@ pub fn serialize_bedrock_packet(packet: &BClientboundPacket) -> Option<Bytes> {
             crate::net::bedrock::BedrockClient::write_raw_packet(&p, &mut buf).unwrap();
             Some(buf.into())
         }
+        BClientboundPacket::CPlayStatus(data) => {
+            let p = match data {
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::LoginSuccess => pumpkin_protocol::bedrock::client::CPlayStatus::LoginSuccess,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::OutdatedClient => pumpkin_protocol::bedrock::client::CPlayStatus::OutdatedClient,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::OutdatedServer => pumpkin_protocol::bedrock::client::CPlayStatus::OutdatedServer,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::PlayerSpawn => pumpkin_protocol::bedrock::client::CPlayStatus::PlayerSpawn,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::InvalidTenant => pumpkin_protocol::bedrock::client::CPlayStatus::InvalidTenant,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditionMismatchEduToVanilla => pumpkin_protocol::bedrock::client::CPlayStatus::EditionMismatchEduToVanilla,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditionMismatchVanillaToEdu => pumpkin_protocol::bedrock::client::CPlayStatus::EditionMismatchVanillaToEdu,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::ServerFullSubClient => pumpkin_protocol::bedrock::client::CPlayStatus::ServerFullSubClient,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditorMismatchEditorToVanilla => pumpkin_protocol::bedrock::client::CPlayStatus::EditorMismatchEditorToVanilla,
+                crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditorMismatchVanillaToEditor => pumpkin_protocol::bedrock::client::CPlayStatus::EditorMismatchVanillaToEditor,
+            };
+            let mut buf = Vec::new();
+            crate::net::bedrock::BedrockClient::write_raw_packet(&p, &mut buf).unwrap();
+            Some(buf.into())
+        }
         BClientboundPacket::CPlayerHotbar(data) => {
             let p = pumpkin_protocol::bedrock::client::CPlayerHotbar {
                 selected_slot: pumpkin_protocol::codec::var_uint::VarUInt(
@@ -2485,6 +2510,23 @@ impl ToWitClientboundBedrock for pumpkin_protocol::bedrock::client::CNetworkSett
     }
 }
 
+impl ToWitClientboundBedrock for pumpkin_protocol::bedrock::client::CPlayStatus {
+    fn to_wit(&self) -> BClientboundPacket {
+        match self {
+            Self::LoginSuccess => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::LoginSuccess),
+            Self::OutdatedClient => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::OutdatedClient),
+            Self::OutdatedServer => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::OutdatedServer),
+            Self::PlayerSpawn => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::PlayerSpawn),
+            Self::InvalidTenant => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::InvalidTenant),
+            Self::EditionMismatchEduToVanilla => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditionMismatchEduToVanilla),
+            Self::EditionMismatchVanillaToEdu => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditionMismatchVanillaToEdu),
+            Self::ServerFullSubClient => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::ServerFullSubClient),
+            Self::EditorMismatchEditorToVanilla => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditorMismatchEditorToVanilla),
+            Self::EditorMismatchVanillaToEditor => BClientboundPacket::CPlayStatus(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayStatus::EditorMismatchVanillaToEditor),
+        }
+    }
+}
+
 impl ToWitClientboundBedrock for pumpkin_protocol::bedrock::client::CPlayerHotbar {
     fn to_wit(&self) -> BClientboundPacket {
         BClientboundPacket::CPlayerHotbar(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::bedrock_packets::CPlayerHotbar {
@@ -2624,6 +2666,9 @@ pub fn clientbound_bedrock_any_to_wit(any: &dyn Any) -> Option<BClientboundPacke
         return Some(p.to_wit());
     }
     if let Some(p) = any.downcast_ref::<pumpkin_protocol::bedrock::client::CNetworkSettings>() {
+        return Some(p.to_wit());
+    }
+    if let Some(p) = any.downcast_ref::<pumpkin_protocol::bedrock::client::CPlayStatus>() {
         return Some(p.to_wit());
     }
     if let Some(p) = any.downcast_ref::<pumpkin_protocol::bedrock::client::CPlayerHotbar>() {
