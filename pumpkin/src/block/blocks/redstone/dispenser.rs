@@ -209,21 +209,21 @@ impl BlockBehaviour for DispenserBlock {
                     ];
                     let boats = BoatItem::ids();
 
-                    if arrows.contains(&item.item.id) {
+                    if arrows.contains(&item.item.id) {                             // Arrows
                         Self::fire_arrow(&ctx, &mut item).await;
-                    } else if boats.contains(&item.item.id) {
+                    } else if boats.contains(&item.item.id) {                       // Boats
                         if !Self::dispense_boat(&ctx, &mut item).await {
                             Self::drop_item(&ctx, &mut item).await;
                         }
-                    } else if item.item.id == Item::ARMOR_STAND.id {
+                    } else if item.item.id == Item::ARMOR_STAND.id {                // Armor stands
                         if !Self::dispense_armor_stand(&ctx, &mut item).await {
                             Self::drop_item(&ctx, &mut item).await;
                         }
-                    } else if item.item.id == Item::TNT.id {
+                    } else if item.item.id == Item::TNT.id {                        // TNT
                         Self::dispense_tnt(&ctx, &mut item).await;
-                    } else if entity_from_egg(item.item.id).is_some() {
+                    } else if entity_from_egg(item.item.id).is_some() {             // Spawn eggs
                         Self::dispense_spawn_egg(&ctx, &mut item).await;
-                    } else {
+                    } else {                                                        // Default / Drop
                         Self::drop_item(&ctx, &mut item).await;
                     }
                 } else {
