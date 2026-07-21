@@ -9,6 +9,7 @@ use crate::block::{
     OnPlaceArgs, OnScheduledTickArgs, PlacedArgs,
 };
 use crate::entity::item::ItemEntity;
+use crate::entity::projectile::arrow::{ArrowEntity, ArrowPickup};
 use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
@@ -16,7 +17,9 @@ use crate::block::entities::dispenser::DispenserBlockEntity;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::{BlockProperties, Facing};
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::translation;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_inventory::generic_container_screen_handler::create_generic_3x3;
@@ -25,6 +28,8 @@ use pumpkin_inventory::screen_handler::{
     BoxFuture, InventoryPlayer, ScreenHandlerFactory, SharedScreenHandler,
 };
 use pumpkin_macros::pumpkin_block;
+use pumpkin_protocol::IdOr;
+use pumpkin_protocol::java::client::play::CSoundEffect;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::text::TextComponent;
@@ -184,8 +189,15 @@ impl BlockBehaviour for DispenserBlock {
                     );
                     let ctx = DispenseContext::new(&args, props.facing);
 
-                    // No specific dispenser behaviors are registered yet, so dispense item into the world
-                    Self::drop_item(&ctx, &mut item).await;
+                    // Still missing some specific dispenser behavior that you can find here:
+                    // https://minecraft.wiki/w/Dispenser#Usage
+                    let arrows = [Item::ARROW.id, Item::TIPPED_ARROW.id, Item::SPECTRAL_ARROW.id];
+
+                    if arrows.contains(&item.item.id) {
+                        Self::fire_arrow(&ctx, &mut item).await;
+                    } else {
+                        Self::drop_item(&ctx, &mut item).await;
+                    }
                 } else {
                     args.world
                         .sync_world_event(WorldEvent::SoundDispenserFail, *args.position, 0);
@@ -211,6 +223,60 @@ impl BlockBehaviour for DispenserBlock {
 }
 
 impl DispenserBlock {
+    const ARROW_DISPENSE_POWER: f64 = 1.1;
+    const ARROW_DISPENSE_UNCERTAINTY: f64 = 6.0;
+
+    async fn fire_arrow(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
+        // TODO: Add tipped arrows
+        let entity_type = if item.item.id == Item::SPECTRAL_ARROW.id {
+            &EntityType::SPECTRAL_ARROW
+        } else {
+            &EntityType::ARROW
+        };
+        let _ = item.split(1);
+
+        let facing = to_normal(ctx.facing);
+        let position = ctx.position.to_centered_f64().add(&(facing * 0.7));
+        let world = ctx.world;
+
+        let arrow_entity = Entity::new(world.clone(), position, entity_type);
+        let mut arrow = ArrowEntity::new(arrow_entity, None);
+        arrow.pickup = ArrowPickup::Allowed;
+
+        arrow.set_velocity(
+            facing.x,
+            facing.y + 0.1,
+            facing.z,
+            Self::ARROW_DISPENSE_POWER,
+            Self::ARROW_DISPENSE_UNCERTAINTY,
+        );
+
+        let chunk_pos = arrow.get_entity().chunk_pos.load();
+        let arrow_arc: Arc<dyn EntityBase> = Arc::new(arrow);
+        world.spawn_entity(arrow_arc).await;
+
+        let sound_pitch = 1.0 / (rand::random::<f32>() * 0.4 + 1.2) * 0.5;
+        let sound_packet = CSoundEffect::new(
+            IdOr::Id(Sound::EntityArrowShoot as u16),
+            SoundCategory::Neutral,
+            &position,
+            1.0,
+            sound_pitch,
+            0.0,
+        );
+
+        world.broadcast_to_chunk(chunk_pos, &sound_packet);
+
+        ctx.world
+            .sync_world_event(WorldEvent::SoundDispenserDispense, *ctx.position, 0);
+
+        ctx.world.sync_world_event(
+            WorldEvent::ParticlesShootSmoke,
+            *ctx.position,
+            to_data3d(ctx.facing),
+        );
+    }
+
     async fn drop_item(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
         let drop_item = item.split(1);
         let facing = to_normal(ctx.facing);
