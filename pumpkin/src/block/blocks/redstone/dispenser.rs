@@ -10,11 +10,13 @@ use crate::block::{
 };
 use crate::entity::item::ItemEntity;
 use crate::entity::{Entity, EntityBase};
+use crate::world::World;
 
 use crate::block::entities::dispenser::DispenserBlockEntity;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::{BlockProperties, Facing};
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::translation;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_inventory::generic_container_screen_handler::create_generic_3x3;
@@ -23,6 +25,7 @@ use pumpkin_inventory::screen_handler::{
     BoxFuture, InventoryPlayer, ScreenHandlerFactory, SharedScreenHandler,
 };
 use pumpkin_macros::pumpkin_block;
+use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::text::TextComponent;
 use pumpkin_world::inventory::Inventory;
@@ -59,6 +62,22 @@ impl ScreenHandlerFactory for DispenserScreenFactory {
 pub struct DispenserBlock;
 
 type DispenserLikeProperties = pumpkin_data::block_properties::DispenserLikeProperties;
+
+struct DispenseContext<'a> {
+    world: &'a Arc<World>,
+    position: &'a BlockPos,
+    facing: Facing,
+}
+
+impl<'a> DispenseContext<'a> {
+    const fn new(args: &OnScheduledTickArgs<'a>, facing: Facing) -> Self {
+        Self {
+            world: args.world,
+            position: args.position,
+            facing,
+        }
+    }
+}
 
 fn triangle<R: Rng>(rng: &mut R, min: f64, max: f64) -> f64 {
     (rng.random::<f64>() - rng.random::<f64>()).mul_add(max, min)
@@ -163,42 +182,10 @@ impl BlockBehaviour for DispenserBlock {
                         args.world.get_block_state(args.position).id,
                         args.block,
                     );
+                    let ctx = DispenseContext::new(&args, props.facing);
 
                     // No specific dispenser behaviors are registered yet, so dispense item into the world
-                    let drop_item = item.split(1);
-                    let facing = to_normal(props.facing);
-                    let mut position = args.position.to_centered_f64().add(&(facing * 0.7));
-
-                    position.y -= match props.facing {
-                        Facing::Up | Facing::Down => 0.125,
-                        _ => 0.15625,
-                    };
-
-                    let entity = Entity::new(args.world.clone(), position, &EntityType::ITEM);
-                    let rd = rng().random::<f64>().mul_add(0.1, 0.2);
-
-                    let velocity = Vector3::new(
-                        triangle(&mut rng(), facing.x * rd, 0.017_227_5 * 6.),
-                        triangle(&mut rng(), 0.2, 0.017_227_5 * 6.),
-                        triangle(&mut rng(), facing.z * rd, 0.017_227_5 * 6.),
-                    );
-
-                    let item_entity = Arc::new(ItemEntity::new_with_velocity(
-                        entity, drop_item, velocity, 40,
-                    ));
-                    args.world.spawn_entity(item_entity).await;
-
-                    args.world.sync_world_event(
-                        WorldEvent::SoundDispenserDispense,
-                        *args.position,
-                        0,
-                    );
-
-                    args.world.sync_world_event(
-                        WorldEvent::ParticlesShootSmoke,
-                        *args.position,
-                        to_data3d(props.facing),
-                    );
+                    Self::drop_item(&ctx, &mut item).await;
                 } else {
                     args.world
                         .sync_world_event(WorldEvent::SoundDispenserFail, *args.position, 0);
@@ -220,5 +207,41 @@ impl BlockBehaviour for DispenserBlock {
                 None
             }
         })
+    }
+}
+
+impl DispenserBlock {
+    async fn drop_item(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
+        let drop_item = item.split(1);
+        let facing = to_normal(ctx.facing);
+        let mut position = ctx.position.to_centered_f64().add(&(facing * 0.7));
+
+        position.y -= match ctx.facing {
+            Facing::Up | Facing::Down => 0.125,
+            _ => 0.15625,
+        };
+
+        let entity = Entity::new(ctx.world.clone(), position, &EntityType::ITEM);
+        let rd = rng().random::<f64>().mul_add(0.1, 0.2);
+
+        let velocity = Vector3::new(
+            triangle(&mut rng(), facing.x * rd, 0.017_227_5 * 6.),
+            triangle(&mut rng(), 0.2, 0.017_227_5 * 6.),
+            triangle(&mut rng(), facing.z * rd, 0.017_227_5 * 6.),
+        );
+
+        let item_entity = Arc::new(ItemEntity::new_with_velocity(
+            entity, drop_item, velocity, 40,
+        ));
+        ctx.world.spawn_entity(item_entity).await;
+
+        ctx.world
+            .sync_world_event(WorldEvent::SoundDispenserDispense, *ctx.position, 0);
+
+        ctx.world.sync_world_event(
+            WorldEvent::ParticlesShootSmoke,
+            *ctx.position,
+            to_data3d(ctx.facing),
+        );
     }
 }
