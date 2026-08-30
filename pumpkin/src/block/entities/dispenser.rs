@@ -77,14 +77,14 @@ impl DispenserBlockEntity {
             dirty: AtomicBool::new(false),
         }
     }
-    pub async fn get_random_slot(&self) -> Option<MutexGuard<'_, ItemStack>> {
+    pub async fn get_random_slot(&self) -> Option<(usize, MutexGuard<'_, ItemStack>)> {
         let mut ret = None;
         let mut j = 1;
-        for i in &self.items {
+        for (index, i) in self.items.iter().enumerate() {
             let item = i.lock().await;
             if !item.is_empty() {
                 if rng().random_range(0..j) == 0 {
-                    ret = Some(item);
+                    ret = Some((index, item));
                 }
                 j += 1;
             }

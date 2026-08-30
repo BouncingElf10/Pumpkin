@@ -44,6 +44,28 @@ impl Ignition {
 
         false
     }
+
+    pub async fn ignite_position<F, Fut>(ignite_logic: F, world: &Arc<World>, pos: BlockPos) -> bool
+    where
+        F: FnOnce(Arc<World>, BlockPos, BlockStateId) -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        if FireBlockBase::can_place_at(world, &pos) {
+            let fire_block = FireBlockBase::get_fire_type(world, &pos);
+            let state_id = FireBlock.get_state_for_position(world, &fire_block, &pos);
+            ignite_logic(world.clone(), pos, state_id).await;
+            return true;
+        }
+
+        let block = world.get_block(&pos);
+        let state_id = world.get_block_state_id(&pos);
+        if let Some(new_state_id) = can_be_lit(block, state_id) {
+            ignite_logic(world.clone(), pos, new_state_id).await;
+            return true;
+        }
+
+        false
+    }
 }
 
 fn can_be_lit(block: &Block, state_id: BlockStateId) -> Option<BlockStateId> {

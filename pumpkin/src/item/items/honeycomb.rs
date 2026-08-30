@@ -16,7 +16,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, tag};
-use pumpkin_data::{BlockDirection, BlockId};
+use pumpkin_data::{BlockDirection, BlockId, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::world::BlockFlags;
@@ -42,37 +42,9 @@ impl ItemBehaviour for HoneyCombItem {
     ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
         Box::pin(async move {
             let world = player.world();
+            let state_id = world.get_block_state_id(&location);
 
-            // First we try to strip the block. by getting his equivalent and applying it the axis.
-            let replacement = get_waxed_equivalent(block.id);
-            // If there is a strip equivalent.
-            if let Some(replacement) = replacement {
-                // get block state of the old log.
-                // get the log properties
-                // create new properties for the new log.
-                let new_block = replacement.to_block();
-
-                let new_state_id = if block.has_tag(&tag::Block::MINECRAFT_DOORS)
-                    && block.has_tag(&tag::Block::MINECRAFT_DOORS)
-                {
-                    // get block state of the old log.
-                    let door_information = world.get_block_state_id(&location);
-                    // get the log properties
-                    let door_props = OakDoorLikeProperties::from_state_id(door_information, block);
-                    // create new properties for the new log.
-                    let mut new_door_properties = OakDoorLikeProperties::default(new_block);
-                    // Set old axis to the new log.
-                    new_door_properties.facing = door_props.facing;
-                    new_door_properties.open = door_props.open;
-                    new_door_properties.half = door_props.half;
-                    new_door_properties.hinge = door_props.hinge;
-                    new_door_properties.powered = door_props.powered;
-                    new_door_properties.to_state_id(new_block)
-                } else {
-                    new_block.default_state.id
-                };
-
-                // TODO Implements trapdoors
+            if let Some(new_state_id) = get_waxed_state(block, state_id) {
                 world
                     .set_block_state(&location, new_state_id, BlockFlags::NOTIFY_ALL)
                     .await;
@@ -100,6 +72,24 @@ impl HoneyCombItem {
 
         BlockActionResult::Success
     }
+}
+
+pub(crate) fn get_waxed_state(block: &Block, state_id: BlockStateId) -> Option<BlockStateId> {
+    let new_block = get_waxed_equivalent(block.id)?.to_block();
+
+    // TODO: Implement trapdoors
+    if block.has_tag(&tag::Block::MINECRAFT_DOORS) {
+        let door_props = OakDoorLikeProperties::from_state_id(state_id, block);
+        let mut new_door_properties = OakDoorLikeProperties::default(new_block);
+        new_door_properties.facing = door_props.facing;
+        new_door_properties.open = door_props.open;
+        new_door_properties.half = door_props.half;
+        new_door_properties.hinge = door_props.hinge;
+        new_door_properties.powered = door_props.powered;
+        return Some(new_door_properties.to_state_id(new_block));
+    }
+
+    Some(new_block.default_state.id)
 }
 
 const fn get_waxed_equivalent(id: BlockId) -> Option<BlockId> {

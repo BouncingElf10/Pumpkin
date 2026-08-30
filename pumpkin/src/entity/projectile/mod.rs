@@ -296,10 +296,9 @@ fn calculate_ray_intersection(
         }
     }
 
-    (0.0..=1.0).contains(&t_min).then_some(t_min)
+    (t_min <= t_max && (0.0..=1.0).contains(&t_min)).then_some(t_min)
 }
 
-/// Get the face of the block that was hit
 fn get_hit_face(hit_pos: Vector3<f64>, block_pos: BlockPos) -> BlockDirection {
     let local = hit_pos.sub(&block_pos.0.to_f64());
     let eps = 1.0e-4;
